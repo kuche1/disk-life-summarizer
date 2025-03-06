@@ -2,6 +2,7 @@
 
 import subprocess
 import argparse
+import os
 
 OUTPUT_SMARTCTL_ERROR = 'ERROR_SMARTCTL'
 
@@ -94,6 +95,14 @@ def main(disks:list[str]):
 
         assert False
 
+    longest_disk_name = 0
+    for idx, (disk, age) in enumerate(ages):
+        disk = os.path.basename(disk)
+        ages[idx] = (disk, age)
+
+        if len(disk) > longest_disk_name:
+            longest_disk_name = len(disk)
+
     for disk, age_hours in ages:
 
         if type(age_hours) == str:
@@ -114,7 +123,7 @@ def main(disks:list[str]):
 
             data = f'dimentia[{dimentia_percent:>6.2f}%]; death[{death_percent:>6.2f}%]; years[{age_years:>1.0f}], days[{age_days:>3.0f}], hours[{age_hours:>2.0f}]'
 
-        print(f'disk[{disk:<8}]; {data}')
+        print(f'disk[{disk:<{longest_disk_name}}]; {data}')
         # also formatting the disk name in case in the future we need to add nvmes
 
 if __name__ == '__main__':
