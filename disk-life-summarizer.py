@@ -103,6 +103,9 @@ def main(disks:list[str]):
         if len(disk) > longest_disk_name:
             longest_disk_name = len(disk)
 
+    ages.sort(key=lambda i: i[1])
+    # so that the oldest is last
+
     for disk, age_hours in ages:
 
         if type(age_hours) == str:
