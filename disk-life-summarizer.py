@@ -156,11 +156,7 @@ def main(disks:list[str]):
 
     for disk in disk_objs:
 
-        if type(disk.age_hours) == str:
-
-            age_data = age_hours
-
-        else:
+        if True:
 
             death_percent = 100 * disk.age_hours / DISK_DEATH_HOURS
 
