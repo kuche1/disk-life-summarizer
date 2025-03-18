@@ -13,10 +13,13 @@ DISK_DEATH_HOURS = 24 * 365.25 * 14
 # assuming that a disk is going to die after being powered on for N hours
 
 class Disk:
-    def __init__(self, name:str, age_hours:int|str, health:float):
+    def __init__(self, name:str, age_hours:int|str, health:float, health_attr_name:str, health_value:float, health_threshold:float):
         self.name = name
         self.age_hours = age_hours
         self.health = health
+        self.health_attr_name = health_attr_name
+        self.health_value = health_value
+        self.health_threshold = health_threshold
 
 def term(cmds:list[str]) -> str:
     return subprocess.run(cmds, check=True, capture_output=True).stdout.decode()
@@ -82,6 +85,9 @@ def parse_health(output:str):
         output = output[idx+len(tmp):]
 
         worst_health = float('inf')
+        worst_health_name = 'UNKNOWN'
+        worst_health_val = 1
+        worst_health_thr = 0
 
         for line in output.splitlines():
             if len(line) == 0:
@@ -94,7 +100,7 @@ def parse_health(output:str):
             line = line.strip()
 
             # print(f'{line=}')
-            _id, _attr, _flag, current_value, worst_value, threshold, typee, _updated, _when_failed = line.split(' ')[:9] # the raw value CAN have spaces within
+            _id, attribute, _flag, current_value, worst_value, threshold, typee, _updated, _when_failed = line.split(' ')[:9] # the raw value CAN have spaces within
 
             if typee.lower() != 'pre-fail':
                 continue
@@ -106,20 +112,23 @@ def parse_health(output:str):
             if threshold == 0:
                 continue
 
-            print(f'{current_value=} {worst_value=} {threshold=}')
+            # print(f'{current_value=} {worst_value=} {threshold=}')
 
-            health = current_value / threshold
+            health = worst_value / threshold
 
-            print(f'{health=}')
+            # print(f'{health=}')
 
             if health < worst_health:
                 worst_health = health
+                worst_health_name = attribute
+                worst_health_val = worst_value
+                worst_health_thr = threshold
 
-        return worst_health
+        return worst_health, worst_health_name, worst_health_val, worst_health_thr
 
     else:
 
-        return float('inf')
+        return float('inf'), 'UNKNOWN', 1, 0
 
 def main(disks:list[str]):
     outputs = []
@@ -139,18 +148,23 @@ def main(disks:list[str]):
         # if output == OUTPUT_SMARTCTL_ERROR:
         #     return OUTPUT_SMARTCTL_ERROR
         age = parse_age(output)
-        health = parse_health(output)
-        disk_objs.append(Disk(disk, age, health))
+        health, health_attr_name, health_value, health_threshold = parse_health(output)
+        disk_objs.append(Disk(disk, age, health, health_attr_name, health_value, health_threshold))
 
     # shorten names
 
     longest_disk_name = 0
+    longest_health_attr_name = 0
+    
     for disk in disk_objs:
         disk.name = os.path.realpath(disk.name)
         disk.name = os.path.basename(disk.name)
 
         if len(disk.name) > longest_disk_name:
             longest_disk_name = len(disk.name)
+
+        if len(disk.health_attr_name) > longest_health_attr_name:
+            longest_health_attr_name = len(disk.health_attr_name)
 
     disk_objs.sort(key=lambda d: d.age_hours)
 
@@ -168,12 +182,14 @@ def main(disks:list[str]):
             age_years = age_days // 365.25
             age_days = age_days % 365.25
 
-            age_data = f'dimentia[{dimentia_percent:>6.2f}%]; death[{death_percent:>6.2f}%]; age_ydh[{age_years:>1.0f}/{age_days:>3.0f}/{age_hours:>2.0f}]'
+            age_data = f'age_ydh[{age_years:>1.0f}/{age_days:>3.0f}/{age_hours:>2.0f}]; dimentia[{dimentia_percent:>6.2f}%]; death[{death_percent:>6.2f}%]'
 
-        health = disk.health
+        if True:
+            health = disk.health
+            health_attr_name = disk.health_attr_name
+            health_data = f'health[{health:4.2f}: {disk.health_value:3.0f}/{disk.health_threshold:3.0f}: {health_attr_name:<{longest_health_attr_name}}]'
 
-        print(f'disk[{disk.name:<{longest_disk_name}}]; health[{health:4.2f}]; {age_data}')
-        # also formatting the disk name in case in the future we need to add nvmes
+        print(f'disk[{disk.name:<{longest_disk_name}}]; {health_data}; {age_data}')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('summarize disk life')
